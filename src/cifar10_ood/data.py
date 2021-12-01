@@ -29,6 +29,54 @@ def stream_download(dataurl,download_path):
             f.write(data)
     t.close()
 
+def unzip_to(source,targetdirectory):
+    """Unzips source to create a folder in the target directory
+
+    """
+    with zipfile.ZipFile(source,"r") as zf:
+        for member in tqdm(zf.infolist(), desc='Extracting '):
+            try:
+                zf.extract(member, targetdirectory)
+            except zipfile.error as e:
+                pass
+
+class CINIC10(torchvision.datasets.ImageFolder):
+    """Pytorch wrapper around the CINIC10 (imagenet only) dataset (https://github.com/BayesWatch/cinic-10). Assumes that the zipped dataset is already stored locally () using git LFS. 
+
+    """
+    def __init__(self,root_dir,split,transform = None,target_transform = None,loader=None,is_valid_file=None):
+        """
+        :param root_dir: path to store data files. 
+        :param split: which split (train/test/val) of the data to grab. 
+        :param transform: an optional transform to be applied on PIL image samples.
+        :param target_transform: an optional transform to be applied to targets. 
+        :param loader: an optional callable to load in images.
+        :param is_valid_file: an optional loader to check image vailidity. 
+        """
+        assert str(root_dir).endswith("cinic-10"), "the directory must be called `cinic-10`"
+        assert split in ["train","test","val"]
+        if not os.path.exists(os.path.join(root_dir,"train")):
+            here = os.path.dirname(os.path.abspath(__file__))
+            zippath = os.path.join(here,"../../data/cinic-10.zip") 
+            assert os.path.exists(zippath); "Error: zipped cinic-10 dataset not located."
+            unzip_to(zippath,os.path.dirname(root_dir)) ## creates cinic-10 dataset at requested location. 
+
+        ## First, check if the dataset exists. If not, unzip it from local. 
+        args = {"transform":transform,
+                "target_transform":target_transform,
+                "loader":loader,
+                "is_valid_file":is_valid_file}
+        kws = {}
+        for key in args:
+            if args[key] is not None:
+                kws[key] = args[key]
+        super().__init__(os.path.join(root_dir,split),**kws)
+
+        ## Class-index mapping from original CIFAR10 dataset:  
+        self.classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+        self.class_to_idx = {'airplane': 0, 'automobile': 1, 'bird': 2, 'cat': 3, 'deer': 4, 'dog': 5, 'frog': 6, 'horse': 7, 'ship': 8, 'truck': 9}
+
+
 class CIFAR10_1(torchvision.datasets.vision.VisionDataset):
     """Pytorch wrapper around the CIFAR10.1 dataset (https://github.com/modestyachts/CIFAR-10.1)
 
@@ -95,6 +143,49 @@ class CIFAR10_1(torchvision.datasets.vision.VisionDataset):
             target = self.target_transform(target)
         sample = (img,target)
         return sample
+
+class CINIC10Data(pl.LightningDataModule):
+    def __init__(self,args):
+        self.hparams = args
+        self.mean = (0.47889522, 0.47227842, 0.43047404)
+        self.std = (0.24205776, 0.23828046, 0.25874835)
+
+    def train_dataloader(self):    
+        raise NotImplementedError("don't know the right transforms for this- will implement later")
+
+    def val_dataloader(self):
+        transform = T.Compose(
+            [
+                T.ToTensor(),
+                T.Normalize(self.mean, self.std),
+            ]
+        )
+        dataset = CINIC10(root_dir=os.path.join(self.hparams.data_dir,"cinic-10"), split="val", transform=transform)
+        dataloader = DataLoader(
+            dataset,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            drop_last=False,
+            pin_memory=True,
+        )
+        return dataloader
+
+    def test_dataloader(self):
+        transform = T.Compose(
+            [
+                T.ToTensor(),
+                T.Normalize(self.mean, self.std),
+            ]
+        )
+        dataset = CINIC10(root_dir=os.path.join(self.hparams.data_dir,"cinic-10"), split="test", transform=transform)
+        dataloader = DataLoader(
+            dataset,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            drop_last=False,
+            pin_memory=True,
+        )
+        return dataloader
 
 
 class CIFAR10_1Data(pl.LightningDataModule):

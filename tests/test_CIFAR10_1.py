@@ -9,7 +9,7 @@ from PIL import Image
 here = os.path.abspath(os.path.dirname(__file__))
 #sys.path.insert(1,os.path.join(here,"../src/Pytorch_CIFAR10"))
 
-from interpensembles.data import CIFAR10_1 
+from cifar10_ood.data import CIFAR10_1 
 from torchvision.datasets import CIFAR10
 
 class Test_CIFAR10_1:
