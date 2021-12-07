@@ -144,7 +144,7 @@ class CIFAR10_1(torchvision.datasets.vision.VisionDataset):
         sample = (img,target)
         return sample
 
-class CINIC10Data(pl.LightningDataModule):
+class CINIC10_Data(pl.LightningDataModule):
     def __init__(self,args):
         self.hparams = args
         self.mean = (0.47889522, 0.47227842, 0.43047404)
