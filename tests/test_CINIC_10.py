@@ -10,7 +10,7 @@ import zipfile
 
 here = os.path.abspath(os.path.dirname(__file__))
 
-from cifar10_ood.data import CINIC10
+from cifar10_ood.data import CINIC10,CIFAR10_C
 from torchvision.datasets import CIFAR10
 
 class Test_CINIC10:
