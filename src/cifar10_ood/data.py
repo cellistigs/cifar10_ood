@@ -40,6 +40,86 @@ def unzip_to(source,targetdirectory):
             except zipfile.error as e:
                 pass
 
+class CIFAR10_C(torchvision.datasets.vision.VisionDataset):
+    """Pytorch wrapper around the CIFAR10-C dataset (https://zenodo.org/record/2535967#.YbDe8i1h3PA)
+
+    """
+    def __init__(self,root_dir,corruption,level,transform = None,target_transform = None):
+        """
+        :param root_dir: path to store data files. 
+        :param corruption: the kind of corruption we want to study. should be one of:
+          - brightness 
+          - contrast
+          - defocus_blur
+          - elastic_transform
+          - fog
+          - frost
+          - gaussian_blur
+          - gaussian_noise
+          - glass_blur
+          - impulse_noise
+          - jpeg_compression
+          - motion_blur
+          - pixelate
+          - saturate
+          - shot_noise
+          - snow
+          - spatter
+          - speckle_noise
+          - zoom_blur
+        :param level: a corruption level from 1-5.   
+        :param transform: an optional transform to be applied on PIL image samples.
+        :param target_transform: an optional transform to be applied to targets. 
+        **NB: there is an attribute "transforms" that we don't make use of in this class that the original CIFAR10 might.**
+        """
+        here = os.path.dirname(os.path.abspath(__file__))
+        super().__init__(root_dir,transform = transform, target_transform = target_transform)
+        assert corruption in ["brightness", 
+                          "contrast",
+                          "defocus_blur",
+                          "elastic_transform",
+                          "fog",
+                          "frost",
+                          "gaussian_blur",
+                          "gaussian_noise",
+                          "glass_blur",
+                          "impulse_noise",
+                          "jpeg_compression",
+                          "motion_blur",
+                          "pixelate",
+                          "saturate",
+                          "shot_noise",
+                          "snow",
+                          "spatter",
+                          "speckle_noise",
+                          "zoom_blur",
+                                    ], "corruption must be one of those listed. (check docstring)"
+        self.corruption = corruption
+        assert level in np.arange(1,6), "level must be between 1 and 5 " 
+        self.level = level
+        ## Check data unzipped:  
+        corruptiondir = os.path.join(root_dir,self.corruption)
+        if not os.path.exists(corruptiondir):
+            os.mkdir(corruptiondir)
+        datapath = os.path.join(corruptiondir,"cifar10c_{}_data.npy".format(self.corruption))
+        targetpath = os.path.join(corruptiondir,"cifar10c_{}_labels.npy".format(self.corruption))
+        if not os.path.exists(datapath) or not os.path.exists(targetpath):
+            zippath = os.path.join(here,"../../data/cifar10-c/{}.zip".format(self.corruption)) 
+            assert os.path.exists(zippath); "Error: zipped cifar10-c dataset not located."
+
+            unzip_to(zippath,corruptiondir) ## creates cinic-10 dataset at requested location. 
+
+        ## Now get data and put it in memory: 
+        self.alldata = np.load(datapath)
+        self.alltargets = list(np.load(targetpath))
+        start_index = (self.level-1)*10000
+        end_index = (self.level)*10000
+        self.data = self.alldata[start_index:end_index,:]
+        self.targets = self.alltargets[start_index:end_index]
+        ## Class-index mapping from original CIFAR10 dataset:  
+        self.classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+        self.class_to_idx = {'airplane': 0, 'automobile': 1, 'bird': 2, 'cat': 3, 'deer': 4, 'dog': 5, 'frog': 6, 'horse': 7, 'ship': 8, 'truck': 9}
+
 class CINIC10(torchvision.datasets.ImageFolder):
     """Pytorch wrapper around the CINIC10 (imagenet only) dataset (https://github.com/BayesWatch/cinic-10). Assumes that the zipped dataset is already stored locally () using git LFS. 
 
@@ -207,6 +287,40 @@ class CIFAR10_1Data(pl.LightningDataModule):
             ]
         )
         dataset = CIFAR10_1(root_dir=self.hparams.data_dir, train=False, transform=transform,version = self.version)
+        dataloader = DataLoader(
+            dataset,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            drop_last=False,
+            pin_memory=True,
+        )
+        return dataloader
+
+    def test_dataloader(self):
+        return self.val_dataloader()
+
+class CIFAR10_CData(pl.LightningDataModule):
+    """Dataset management- downloading, hyperparams, etc. 
+
+    :param args: the argparse parse_args output. key here is the root_dir parameter- we will work with a subdirectory of `root_dir` called cifar-10c . 
+    """
+    def __init__(self,args):
+        super().__init__()
+        self.hparams = args
+        self.mean = (0.4914, 0.4822, 0.4465) ##? should we revise these? 
+        self.std = (0.2471, 0.2435, 0.2616) ##? 
+
+    def train_dataloader(self):
+        raise NotImplementedError
+
+    def val_dataloader(self):
+        transform = T.Compose(
+            [
+                T.ToTensor(),
+                T.Normalize(self.mean, self.std),
+            ]
+        )
+        dataset = CIFAR10_C(root_dir=os.path.join(self.hparams.data_dir,"cifar10-c"), corruption = args.corruption, level = args.level, transform=transform,version = self.version)
         dataloader = DataLoader(
             dataset,
             batch_size=self.hparams.batch_size,
