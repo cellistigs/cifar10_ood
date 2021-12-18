@@ -155,6 +155,8 @@ class CINIC10(torchvision.datasets.ImageFolder):
         ## Class-index mapping from original CIFAR10 dataset:  
         self.classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
         self.class_to_idx = {'airplane': 0, 'automobile': 1, 'bird': 2, 'cat': 3, 'deer': 4, 'dog': 5, 'frog': 6, 'horse': 7, 'ship': 8, 'truck': 9}
+        self.data = np.stack([s[0] for s in self.samples],axis = 0)
+        self.targets = [s[1] for s in self.samples]
 
 
 class CIFAR10_1(torchvision.datasets.vision.VisionDataset):
