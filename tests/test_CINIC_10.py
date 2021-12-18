@@ -25,7 +25,13 @@ class Test_CINIC10:
         assert [li in ["train","test","valid"] for li in os.listdir(downloads)] ## basic check. 
         assert len(os.listdir(os.path.join(downloads,"test","airplane"))) == 7000
 
-
+    def test_classes(self,tmpdir):
+        downloads = tmpdir / "cinic-10"
+        downloads.mkdir()
+        downloads = os.path.join(here,"../data/cinic-10") 
+        cd = CINIC10(Path(downloads),"test")
+        assert cd.data.shape == (70000,32,32,3)
+        assert len(cd.targets) == 700000 
     #def test_parity(self,tmpdir):
     #    downloads = tmpdir / "cinic-10"
     #    downloads.mkdir()
