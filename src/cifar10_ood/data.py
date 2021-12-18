@@ -124,7 +124,7 @@ class CINIC10(torchvision.datasets.ImageFolder):
     """Pytorch wrapper around the CINIC10 (imagenet only) dataset (https://github.com/BayesWatch/cinic-10). Assumes that the zipped dataset is already stored locally () using git LFS. 
 
     """
-    def __init__(self,root_dir,split,transform = None,target_transform = None,loader=None,is_valid_file=None):
+    def __init__(self,root_dir,split,transform = None,target_transform = None,loader=None,is_valid_file=None,preload = False):
         """
         :param root_dir: path to store data files. 
         :param split: which split (train/test/val) of the data to grab. 
@@ -132,6 +132,7 @@ class CINIC10(torchvision.datasets.ImageFolder):
         :param target_transform: an optional transform to be applied to targets. 
         :param loader: an optional callable to load in images.
         :param is_valid_file: an optional loader to check image vailidity. 
+        :param preload: optionally preload all images into .data attribute
         """
         assert str(root_dir).endswith("cinic-10"), "the directory must be called `cinic-10`"
         assert split in ["train","test","val"]
@@ -155,8 +156,9 @@ class CINIC10(torchvision.datasets.ImageFolder):
         ## Class-index mapping from original CIFAR10 dataset:  
         self.classes = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
         self.class_to_idx = {'airplane': 0, 'automobile': 1, 'bird': 2, 'cat': 3, 'deer': 4, 'dog': 5, 'frog': 6, 'horse': 7, 'ship': 8, 'truck': 9}
-        self.data = np.stack([s[0] for s in self.samples],axis = 0)
-        self.targets = [s[1] for s in self.samples]
+        if preload:
+            self.data = np.stack([np.array(self.__getitem__(i)[0]) for i in range(len(self.samples))],axis = 0)
+            self.targets = [s[1] for s in self.samples]
 
 
 class CIFAR10_1(torchvision.datasets.vision.VisionDataset):
