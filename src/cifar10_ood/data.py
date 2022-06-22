@@ -343,6 +343,20 @@ class CIFAR10Data(pl.LightningDataModule):
         self.hparams = args
         self.mean = (0.4914, 0.4822, 0.4465)
         self.std = (0.2471, 0.2435, 0.2616)
+        ## if softmax targets are given, parse.  
+        if args.get("softmax_targets",False):
+            self.set_targets = self.parse_softmax(args.softmax_targets) 
+        else:    
+            self.set_targets = None
+
+    def parse_softmax(self,path):
+        """Parse the numpy softmax outputs and convert them to a list of labels 
+
+        :param path: path to a numpy file containing softmax outputs we can treat as labels. 
+        """
+        softmax = np.load(path)
+        return list(np.argmax(np.load(path),axis=1))
+        
 
     def download_weights():
         url = (
@@ -383,6 +397,12 @@ class CIFAR10Data(pl.LightningDataModule):
             ]
         )
         dataset = CIFAR10(root=self.hparams.data_dir, train=True, transform=transform,download = True)
+        #TODO softmax_labels 
+        if self.set_targets is not None:
+            dataset.targets = self.set_targets 
+            assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
+            assert dataset.data.shape[1] >= np.max(dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],np.max(dataset.targets)) 
+            
         dataloader = DataLoader(
             dataset,
             batch_size=self.hparams.batch_size,
@@ -401,6 +421,7 @@ class CIFAR10Data(pl.LightningDataModule):
             ]
         )
         dataset = CIFAR10(root=self.hparams.data_dir, train=False, transform=transform,download = True)
+        #TODO softmax_labels 
         dataloader = DataLoader(
             dataset,
             batch_size=self.hparams.batch_size,
