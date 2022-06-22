@@ -436,7 +436,7 @@ class CIFAR10Data(pl.LightningDataModule):
             batch_size=self.hparams.batch_size,
             num_workers=self.hparams.num_workers,
             shuffle=True,
-            drop_last=True,
+            drop_last=False,
             pin_memory=True,
         )
         return dataloader
