@@ -12,13 +12,13 @@ import torchvision
 from torchvision.datasets import CIFAR10
 from tqdm import tqdm
 
-def parse_softmax(path):
-    """Parse the numpy softmax outputs and convert them to a list of labels 
-
-    :param path: path to a numpy file containing softmax outputs we can treat as labels. 
-    """
-    softmax = np.load(path)
-    return list(np.argmax(np.load(path),axis=1))
+#def parse_softmax(path):
+#    """Parse the numpy softmax outputs and convert them to a list of labels 
+#
+#    :param path: path to a numpy file containing softmax outputs we can treat as labels. 
+#    """
+#    softmax = np.load(path)
+#    return list(np.argmax(np.load(path),axis=1))
         
 def stream_download(dataurl,download_path):
     """helper function to monitor downloads. 
@@ -241,8 +241,8 @@ class CINIC10_Data(pl.LightningDataModule):
         self.hparams = args
         self.mean = (0.47889522, 0.47227842, 0.43047404)
         self.std = (0.24205776, 0.23828046, 0.25874835)
-        if args.get("softmax_targets_eval_ood",False):
-            self.set_targets_eval_ood = parse_softmax(args.softmax_targets_eval_ood) 
+        if args.get("custom_targets_eval_ood",False):
+            self.set_targets_eval_ood = np.load(args.custom_targets_eval_ood) 
         else:    
             self.set_targets_eval_ood = None
 
@@ -299,8 +299,8 @@ class CIFAR10_1Data(pl.LightningDataModule):
         self.mean = (0.4914, 0.4822, 0.4465)
         self.std = (0.2471, 0.2435, 0.2616)
         self.version = version
-        if args.get("softmax_targets_eval_ood",False):
-            self.set_targets_eval_ood = parse_softmax(args.softmax_targets_eval_ood) 
+        if args.get("custom_targets_eval_ood",False):
+            self.set_targets_eval_ood = np.load(args.custom_targets_eval_ood) 
         else:    
             self.set_targets_eval_ood = None
 
@@ -342,8 +342,8 @@ class CIFAR10_CData(pl.LightningDataModule):
         self.mean = (0.4914, 0.4822, 0.4465) ##? should we revise these? 
         self.std = (0.2471, 0.2435, 0.2616) ##? 
         self.args = args
-        if args.get("softmax_targets_eval_ood",False):
-            self.set_targets_eval_ood = parse_softmax(args.softmax_targets_eval_ood) 
+        if args.get("custom_targets_eval_ood",False):
+            self.set_targets_eval_ood = np.load(args.custom_targets_eval_ood) 
         else:    
             self.set_targets_eval_ood = None
 
@@ -381,12 +381,14 @@ class CIFAR10Data(pl.LightningDataModule):
         self.mean = (0.4914, 0.4822, 0.4465)
         self.std = (0.2471, 0.2435, 0.2616)
         ## if softmax targets are given, parse.  
-        if args.get("softmax_targets_train",False):
-            self.set_targets_train = parse_softmax(args.softmax_targets_train) 
+        if args.get("custom_targets_train",False):
+            #self.set_targets_train = parse_softmax(args.softmax_targets_train) 
+            ## training targets should be softmax! others should be binary. 
+            self.set_targets_train = np.load(args.custom_targets_train)
         else:    
             self.set_targets_train = None
-        if args.get("softmax_targets_eval_ind",False):
-            self.set_targets_eval_ind = parse_softmax(args.softmax_targets_eval_ind) 
+        if args.get("custom_targets_eval_ind",False):
+            self.set_targets_eval_ind = np.load(args.custom_targets_eval_ind) 
         else:    
             self.set_targets_eval_ind = None
 
