@@ -132,7 +132,7 @@ class CINIC10(torchvision.datasets.ImageFolder):
     """Pytorch wrapper around the CINIC10 (imagenet only) dataset (https://github.com/BayesWatch/cinic-10). Assumes that the zipped dataset is already stored locally () using git LFS. 
 
     """
-    def __init__(self,root_dir,split,transform = None,target_transform = None,loader=None,is_valid_file=None,preload = False):
+    def __init__(self,root_dir,split,transform = None,target_transform = None,loader=None,is_valid_file=None,preload = False,labels=None):
         """
         :param root_dir: path to store data files. 
         :param split: which split (train/test/val) of the data to grab. 
@@ -141,9 +141,11 @@ class CINIC10(torchvision.datasets.ImageFolder):
         :param loader: an optional callable to load in images.
         :param is_valid_file: an optional loader to check image vailidity. 
         :param preload: optionally preload all images into .data attribute
+        :param labels: if labels are given, use these instead of class labels
         """
         assert str(root_dir).endswith("cinic-10"), "the directory must be called `cinic-10`"
         assert split in ["train","test","val"]
+        self.labels = labels
         if not os.path.exists(os.path.join(root_dir,"train")):
             here = os.path.dirname(os.path.abspath(__file__))
             zippath = os.path.join(here,"../../data/cinic-10.zip") 
@@ -168,6 +170,16 @@ class CINIC10(torchvision.datasets.ImageFolder):
             self.data = np.stack([np.array(self.__getitem__(i)[0]) for i in range(len(self.samples))],axis = 0)
             self.targets = [s[1] for s in self.samples]
 
+    def __getitem__(self,idx):
+        """
+        optional override of getitem. 
+        """
+        if self.labels is not None:    
+            img,_ = super().__getitem__(idx)
+            label = self.labels[idx]
+            return (img,label)
+        else:
+            return super().__getitem__(idx)
 
 class CIFAR10_1(torchvision.datasets.vision.VisionDataset):
     """Pytorch wrapper around the CIFAR10.1 dataset (https://github.com/modestyachts/CIFAR-10.1)
@@ -277,11 +289,13 @@ class CINIC10_Data(pl.LightningDataModule):
                 T.Normalize(self.mean, self.std),
             ]
         )
-        dataset = CINIC10(root_dir=os.path.join(self.hparams.data_dir,"cinic-10"), split="test", transform=transform)
         if self.set_targets_eval_ood is not None:
+            dataset = CINIC10(root_dir=os.path.join(self.hparams.data_dir,"cinic-10"), split="test", transform=transform,preload=True,labels=self.set_targets_eval_ood)
             dataset.targets = self.set_targets_eval_ood 
             assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
             assert dataset.data.shape[1] >= np.max(dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],np.max(dataset.targets)) 
+        else:
+            dataset = CINIC10(root_dir=os.path.join(self.hparams.data_dir,"cinic-10"), split="test", transform=transform,preload=True)
         dataloader = DataLoader(
             dataset,
             batch_size=self.hparams.batch_size,
