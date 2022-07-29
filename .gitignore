@@ -1,3 +1,4 @@
 .DS_Store
 src/cifar10_ood.egg-info/
+data/cinic-10.zip
 
