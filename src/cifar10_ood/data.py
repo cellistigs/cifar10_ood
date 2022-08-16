@@ -444,8 +444,8 @@ class CIFAR10Data(pl.LightningDataModule):
         if aug is True:
             transform = T.Compose(
                 [
-                    #T.RandomCrop(32, padding=4),
-                    #T.RandomHorizontalFlip(),
+                    T.RandomCrop(32, padding=4),
+                    T.RandomHorizontalFlip(),
                     T.ToTensor(),
                     T.Normalize(self.mean, self.std),
                 ]
