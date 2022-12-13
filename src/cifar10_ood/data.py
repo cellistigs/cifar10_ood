@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms as T
 import torchvision
-from torchvision.datasets import CIFAR10
+from torchvision.datasets import CIFAR10,MNIST
 from tqdm import tqdm
 
 #def parse_softmax(path):
@@ -481,6 +481,89 @@ class CIFAR10Data(pl.LightningDataModule):
             ]
         )
         dataset = CIFAR10(root=self.hparams.data_dir, train=False, transform=transform,download = True)
+        if self.set_targets_eval_ind is not None:
+            dataset.targets = self.set_targets_eval_ind 
+            assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
+            assert dataset.data.shape[1] >= np.max(dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],np.max(dataset.targets)) 
+        dataloader = DataLoader(
+            dataset,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            drop_last=False,
+            pin_memory=True,
+        )
+        return dataloader
+
+    def test_dataloader(self):
+        return self.val_dataloader()
+
+class MNISTData(pl.LightningDataModule):
+    def __init__(self, args):
+        super().__init__()
+        self.hparams = args
+        #self.mean = (0.4914, 0.4822, 0.4465)
+        #self.std = (0.2471, 0.2435, 0.2616)
+        ## if softmax targets are given, parse.  
+        if args.get("custom_targets_train",False):
+            #self.set_targets_train = parse_softmax(args.softmax_targets_train) 
+            ## training targets should be softmax! others should be binary. 
+            self.set_targets_train = np.load(args.custom_targets_train)
+        else:    
+            self.set_targets_train = None
+        if args.get("custom_targets_eval_ind",False):
+            self.set_targets_eval_ind = np.load(args.custom_targets_eval_ind) 
+        else:    
+            self.set_targets_eval_ind = None
+
+    def train_dataloader(self,shuffle = True,aug=False):
+        """added optional shuffle parameter for generating random labels. 
+        added optional aug parameter to apply augmentation or not. 
+
+        """
+        if aug is True:
+            transform = T.Compose(
+                [
+                    T.RandomCrop(32, padding=4),
+                    T.RandomHorizontalFlip(),
+                    T.ToTensor(),
+                    #T.Normalize(self.mean, self.std),
+                ]
+            )
+        else:    
+            transform = T.Compose(
+                [
+                    T.ToTensor(),
+                    #T.Normalize(self.mean, self.std),
+                ]
+            )
+        dataset = MNIST(root=self.hparams.data_dir, train=True, transform=transform,download = True)
+        if self.hparams.nb_samples is not None:
+            dataset.data = dataset.data[:self.hparams.nb_samples]
+            dataset.targets = dataset.targets[:self.hparams.nb_samples]
+
+        if self.set_targets_train is not None:
+            dataset.targets = self.set_targets_train 
+            assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
+            assert dataset.data.shape[1] >= np.max(dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],np.max(dataset.targets)) 
+            
+        dataloader = DataLoader(
+            dataset,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            shuffle=shuffle,
+            drop_last=False,
+            pin_memory=True,
+        )
+        return dataloader
+
+    def val_dataloader(self):
+        transform = T.Compose(
+            [
+                T.ToTensor(),
+                #T.Normalize(self.mean, self.std),
+            ]
+        )
+        dataset = MNIST(root=self.hparams.data_dir, train=False, transform=transform,download = True)
         if self.set_targets_eval_ind is not None:
             dataset.targets = self.set_targets_eval_ind 
             assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
