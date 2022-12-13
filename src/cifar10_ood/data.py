@@ -12,13 +12,13 @@ import torchvision
 from torchvision.datasets import CIFAR10
 from tqdm import tqdm
 
-def parse_softmax(path):
-    """Parse the numpy softmax outputs and convert them to a list of labels 
-
-    :param path: path to a numpy file containing softmax outputs we can treat as labels. 
-    """
-    softmax = np.load(path)
-    return list(np.argmax(np.load(path),axis=1))
+#def parse_softmax(path):
+#    """Parse the numpy softmax outputs and convert them to a list of labels 
+#
+#    :param path: path to a numpy file containing softmax outputs we can treat as labels. 
+#    """
+#    softmax = np.load(path)
+#    return list(np.argmax(np.load(path),axis=1))
         
 def stream_download(dataurl,download_path):
     """helper function to monitor downloads. 
@@ -132,7 +132,7 @@ class CINIC10(torchvision.datasets.ImageFolder):
     """Pytorch wrapper around the CINIC10 (imagenet only) dataset (https://github.com/BayesWatch/cinic-10). Assumes that the zipped dataset is already stored locally () using git LFS. 
 
     """
-    def __init__(self,root_dir,split,transform = None,target_transform = None,loader=None,is_valid_file=None,preload = False):
+    def __init__(self,root_dir,split,transform = None,target_transform = None,loader=None,is_valid_file=None,preload = False,labels=None):
         """
         :param root_dir: path to store data files. 
         :param split: which split (train/test/val) of the data to grab. 
@@ -141,9 +141,11 @@ class CINIC10(torchvision.datasets.ImageFolder):
         :param loader: an optional callable to load in images.
         :param is_valid_file: an optional loader to check image vailidity. 
         :param preload: optionally preload all images into .data attribute
+        :param labels: if labels are given, use these instead of class labels
         """
         assert str(root_dir).endswith("cinic-10"), "the directory must be called `cinic-10`"
         assert split in ["train","test","val"]
+        self.labels = labels
         if not os.path.exists(os.path.join(root_dir,"train")):
             here = os.path.dirname(os.path.abspath(__file__))
             zippath = os.path.join(here,"../../data/cinic-10.zip") 
@@ -168,6 +170,16 @@ class CINIC10(torchvision.datasets.ImageFolder):
             self.data = np.stack([np.array(self.__getitem__(i)[0]) for i in range(len(self.samples))],axis = 0)
             self.targets = [s[1] for s in self.samples]
 
+    def __getitem__(self,idx):
+        """
+        optional override of getitem. 
+        """
+        if self.labels is not None:    
+            img,_ = super().__getitem__(idx)
+            label = self.labels[idx]
+            return (img,label)
+        else:
+            return super().__getitem__(idx)
 
 class CIFAR10_1(torchvision.datasets.vision.VisionDataset):
     """Pytorch wrapper around the CIFAR10.1 dataset (https://github.com/modestyachts/CIFAR-10.1)
@@ -241,10 +253,10 @@ class CINIC10_Data(pl.LightningDataModule):
         self.hparams = args
         self.mean = (0.47889522, 0.47227842, 0.43047404)
         self.std = (0.24205776, 0.23828046, 0.25874835)
-        if args.get("softmax_targets",False):
-            self.set_targets = parse_softmax(args.softmax_targets) 
+        if args.get("custom_targets_eval_ood",False):
+            self.set_targets_eval_ood = np.load(args.custom_targets_eval_ood) 
         else:    
-            self.set_targets = None
+            self.set_targets_eval_ood = None
 
     def train_dataloader(self):    
         raise NotImplementedError("don't know the right transforms for this- will implement later")
@@ -256,9 +268,9 @@ class CINIC10_Data(pl.LightningDataModule):
                 T.Normalize(self.mean, self.std),
             ]
         )
-        dataset = CINIC10(root_dir=self.hparams.data_dir, split="val", transform=transform)
-        if self.set_targets is not None:
-            dataset.targets = self.set_targets 
+        dataset = CINIC10(root_dir=os.path.join(self.hparams.data_dir,"cinic-10"), split="val", transform=transform)
+        if self.set_targets_eval_ood is not None:
+            dataset.targets = self.set_targets_eval_ood 
             assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
             assert dataset.data.shape[1] >= np.max(dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],np.max(dataset.targets)) 
         dataloader = DataLoader(
@@ -277,11 +289,13 @@ class CINIC10_Data(pl.LightningDataModule):
                 T.Normalize(self.mean, self.std),
             ]
         )
-        dataset = CINIC10(root_dir=self.hparams.data_dir, split="test", transform=transform)
-        if self.set_targets is not None:
-            dataset.targets = self.set_targets 
+        if self.set_targets_eval_ood is not None:
+            dataset = CINIC10(root_dir=os.path.join(self.hparams.data_dir,"cinic-10"), split="test", transform=transform,preload=True,labels=self.set_targets_eval_ood)
+            dataset.targets = self.set_targets_eval_ood 
             assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
             assert dataset.data.shape[1] >= np.max(dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],np.max(dataset.targets)) 
+        else:
+            dataset = CINIC10(root_dir=os.path.join(self.hparams.data_dir,"cinic-10"), split="test", transform=transform,preload=True)
         dataloader = DataLoader(
             dataset,
             batch_size=self.hparams.batch_size,
@@ -299,10 +313,10 @@ class CIFAR10_1Data(pl.LightningDataModule):
         self.mean = (0.4914, 0.4822, 0.4465)
         self.std = (0.2471, 0.2435, 0.2616)
         self.version = version
-        if args.get("softmax_targets",False):
-            self.set_targets = parse_softmax(args.softmax_targets) 
+        if args.get("custom_targets_eval_ood",False):
+            self.set_targets_eval_ood = np.load(args.custom_targets_eval_ood) 
         else:    
-            self.set_targets = None
+            self.set_targets_eval_ood = None
 
     def train_dataloader(self):
         raise NotImplementedError
@@ -315,8 +329,8 @@ class CIFAR10_1Data(pl.LightningDataModule):
             ]
         )
         dataset = CIFAR10_1(root_dir=self.hparams.data_dir, train=False, transform=transform,version = self.version)
-        if self.set_targets is not None:
-            dataset.targets = self.set_targets 
+        if self.set_targets_eval_ood is not None:
+            dataset.targets = self.set_targets_eval_ood 
             assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
             assert dataset.data.shape[1] >= np.max(dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],np.max(dataset.targets)) 
         dataloader = DataLoader(
@@ -342,10 +356,10 @@ class CIFAR10_CData(pl.LightningDataModule):
         self.mean = (0.4914, 0.4822, 0.4465) ##? should we revise these? 
         self.std = (0.2471, 0.2435, 0.2616) ##? 
         self.args = args
-        if args.get("softmax_targets",False):
-            self.set_targets = parse_softmax(args.softmax_targets) 
+        if args.get("custom_targets_eval_ood",False):
+            self.set_targets_eval_ood = np.load(args.custom_targets_eval_ood) 
         else:    
-            self.set_targets = None
+            self.set_targets_eval_ood = None
 
     def train_dataloader(self):
         raise NotImplementedError
@@ -358,8 +372,8 @@ class CIFAR10_CData(pl.LightningDataModule):
             ]
         )
         dataset = CIFAR10_C(root_dir=os.path.join(self.hparams.data_dir,"cifar10-c"), corruption = self.args.corruption, level = self.args.level, transform=transform)
-        if self.set_targets is not None:
-            dataset.targets = self.set_targets 
+        if self.set_targets_eval_ood is not None:
+            dataset.targets = self.set_targets_eval_ood 
             assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
             assert dataset.data.shape[1] >= np.max(dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],np.max(dataset.targets)) 
         dataloader = DataLoader(
@@ -381,10 +395,16 @@ class CIFAR10Data(pl.LightningDataModule):
         self.mean = (0.4914, 0.4822, 0.4465)
         self.std = (0.2471, 0.2435, 0.2616)
         ## if softmax targets are given, parse.  
-        if args.get("softmax_targets",False):
-            self.set_targets = parse_softmax(args.softmax_targets) 
+        if args.get("custom_targets_train",False):
+            #self.set_targets_train = parse_softmax(args.softmax_targets_train) 
+            ## training targets should be softmax! others should be binary. 
+            self.set_targets_train = np.load(args.custom_targets_train)
         else:    
-            self.set_targets = None
+            self.set_targets_train = None
+        if args.get("custom_targets_eval_ind",False):
+            self.set_targets_eval_ind = np.load(args.custom_targets_eval_ind) 
+        else:    
+            self.set_targets_eval_ind = None
 
 
     def download_weights():
@@ -416,18 +436,30 @@ class CIFAR10Data(pl.LightningDataModule):
             zip_ref.extractall(directory_to_extract_to)
             print("Unzip file successful!")
 
-    def train_dataloader(self):
-        transform = T.Compose(
-            [
-                T.RandomCrop(32, padding=4),
-                T.RandomHorizontalFlip(),
-                T.ToTensor(),
-                T.Normalize(self.mean, self.std),
-            ]
-        )
+    def train_dataloader(self,shuffle = True,aug=True):
+        """added optional shuffle parameter for generating random labels. 
+        added optional aug parameter to apply augmentation or not. 
+
+        """
+        if aug is True:
+            transform = T.Compose(
+                [
+                    T.RandomCrop(32, padding=4),
+                    T.RandomHorizontalFlip(),
+                    T.ToTensor(),
+                    T.Normalize(self.mean, self.std),
+                ]
+            )
+        else:    
+            transform = T.Compose(
+                [
+                    T.ToTensor(),
+                    T.Normalize(self.mean, self.std),
+                ]
+            )
         dataset = CIFAR10(root=self.hparams.data_dir, train=True, transform=transform,download = True)
-        if self.set_targets is not None:
-            dataset.targets = self.set_targets 
+        if self.set_targets_train is not None:
+            dataset.targets = self.set_targets_train 
             assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
             assert dataset.data.shape[1] >= np.max(dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],np.max(dataset.targets)) 
             
@@ -435,8 +467,8 @@ class CIFAR10Data(pl.LightningDataModule):
             dataset,
             batch_size=self.hparams.batch_size,
             num_workers=self.hparams.num_workers,
-            shuffle=True,
-            drop_last=True,
+            shuffle=shuffle,
+            drop_last=False,
             pin_memory=True,
         )
         return dataloader
@@ -449,8 +481,8 @@ class CIFAR10Data(pl.LightningDataModule):
             ]
         )
         dataset = CIFAR10(root=self.hparams.data_dir, train=False, transform=transform,download = True)
-        if self.set_targets is not None:
-            dataset.targets = self.set_targets 
+        if self.set_targets_eval_ind is not None:
+            dataset.targets = self.set_targets_eval_ind 
             assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
             assert dataset.data.shape[1] >= np.max(dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],np.max(dataset.targets)) 
         dataloader = DataLoader(
