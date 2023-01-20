@@ -576,5 +576,3 @@ class CIFAR100Data(pl.LightningDataModule):
 
     def test_dataloader(self):
         return self.val_dataloader()
-                                                                                                                                                                                                                                                                                                                                                          659,9         Bot
-        return self.val_dataloader()
