@@ -496,3 +496,85 @@ class CIFAR10Data(pl.LightningDataModule):
 
     def test_dataloader(self):
         return self.val_dataloader()
+
+
+class CIFAR100Data(pl.LightningDataModule):
+    def __init__(self, args):
+        super().__init__()
+        self.hparams = args
+        self.mean = (0.4914, 0.4822, 0.4465)
+        self.std = (0.2023, 0.1994, 0.2010)
+        ## if softmax targets are given, parse.
+        if args.get("custom_targets_train",False):
+            #self.set_targets_train = parse_softmax(args.softmax_targets_train)
+            ## training targets should be softmax! others should be binary.
+            self.set_targets_train = np.load(args.custom_targets_train)
+        else:
+            self.set_targets_train = None
+        if args.get("custom_targets_eval_ind",False):
+            self.set_targets_eval_ind = np.load(args.custom_targets_eval_ind)
+        else:
+            self.set_targets_eval_ind = None
+
+    def train_dataloader(self,shuffle = True,aug=True):
+        """added optional shuffle parameter for generating random labels.
+        added optional aug parameter to apply augmentation or not.
+
+        """
+        if aug is True:
+            transform = T.Compose(
+                [
+                    T.RandomCrop(32, padding=4),
+                    T.RandomHorizontalFlip(),
+                    T.ToTensor(),
+                    T.Normalize(self.mean, self.std),
+                ]
+            )
+        else:
+            transform = T.Compose(
+                [
+                    T.ToTensor(),
+                    T.Normalize(self.mean, self.std),
+                ]
+            )
+        dataset = CIFAR100(root=self.hparams.data_dir, train=True, transform=transform,download = True)
+        if self.set_targets_train is not None:
+            dataset.targets = self.set_targets_train
+            assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
+            assert dataset.data.shape[1] >= np.max(dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],np.max(dataset.targets))
+
+        dataloader = DataLoader(
+            dataset,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            shuffle=shuffle,
+            drop_last=False,
+            pin_memory=True,
+        )
+        return dataloader
+
+    def val_dataloader(self):
+        transform = T.Compose(
+            [
+                T.ToTensor(),
+                T.Normalize(self.mean, self.std),
+            ]
+        )
+        dataset = CIFAR100(root=self.hparams.data_dir, train=False, transform=transform,download = True)
+        if self.set_targets_eval_ind is not None:
+            dataset.targets = self.set_targets_eval_ind
+            assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
+            assert dataset.data.shape[1] >= np.max(dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],np.max(dataset.targets))
+        dataloader = DataLoader(
+            dataset,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            drop_last=False,
+            pin_memory=True,
+        )
+        return dataloader
+
+    def test_dataloader(self):
+        return self.val_dataloader()
+                                                                                                                                                                                                                                                                                                                                                          659,9         Bot
+        return self.val_dataloader()
