@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision import transforms as T
 import torchvision
-from torchvision.datasets import CIFAR10
+from torchvision.datasets import CIFAR10, CIFAR100
 from tqdm import tqdm
 
 #def parse_softmax(path):
