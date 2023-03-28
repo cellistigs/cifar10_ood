@@ -663,3 +663,135 @@ class CIFAR100Data(pl.LightningDataModule):
 
     def test_dataloader(self):
         return self.val_dataloader()
+
+
+class CIFAR100Coarse(CIFAR100):
+    """CIFAR100 with coarse labels.
+    from https://github.com/ryanchankh/cifar100coarse/blob/master/cifar100coarse.py
+    """
+    def __init__(self, root, train=True, transform=None, target_transform=None, download=False):
+        super(CIFAR100Coarse, self).__init__(root, train, transform, target_transform, download)
+
+        # update labels
+        coarse_labels = np.array([ 4,  1, 14,  8,  0,  6,  7,  7, 18,  3,
+                                   3, 14,  9, 18,  7, 11,  3,  9,  7, 11,
+                                   6, 11,  5, 10,  7,  6, 13, 15,  3, 15,
+                                   0, 11,  1, 10, 12, 14, 16,  9, 11,  5,
+                                   5, 19,  8,  8, 15, 13, 14, 17, 18, 10,
+                                   16, 4, 17,  4,  2,  0, 17,  4, 18, 17,
+                                   10, 3,  2, 12, 12, 16, 12,  1,  9, 19,
+                                   2, 10,  0,  1, 16, 12,  9, 13, 15, 13,
+                                  16, 19,  2,  4,  6, 19,  5,  5,  8, 19,
+                                  18,  1,  2, 15,  6,  0, 17,  8, 14, 13])
+        self.targets = coarse_labels[self.targets]
+
+        # update classes
+        self.classes = [['beaver', 'dolphin', 'otter', 'seal', 'whale'],
+                        ['aquarium_fish', 'flatfish', 'ray', 'shark', 'trout'],
+                        ['orchid', 'poppy', 'rose', 'sunflower', 'tulip'],
+                        ['bottle', 'bowl', 'can', 'cup', 'plate'],
+                        ['apple', 'mushroom', 'orange', 'pear', 'sweet_pepper'],
+                        ['clock', 'keyboard', 'lamp', 'telephone', 'television'],
+                        ['bed', 'chair', 'couch', 'table', 'wardrobe'],
+                        ['bee', 'beetle', 'butterfly', 'caterpillar', 'cockroach'],
+                        ['bear', 'leopard', 'lion', 'tiger', 'wolf'],
+                        ['bridge', 'castle', 'house', 'road', 'skyscraper'],
+                        ['cloud', 'forest', 'mountain', 'plain', 'sea'],
+                        ['camel', 'cattle', 'chimpanzee', 'elephant', 'kangaroo'],
+                        ['fox', 'porcupine', 'possum', 'raccoon', 'skunk'],
+                        ['crab', 'lobster', 'snail', 'spider', 'worm'],
+                        ['baby', 'boy', 'girl', 'man', 'woman'],
+                        ['crocodile', 'dinosaur', 'lizard', 'snake', 'turtle'],
+                        ['hamster', 'mouse', 'rabbit', 'shrew', 'squirrel'],
+                        ['maple_tree', 'oak_tree', 'palm_tree', 'pine_tree', 'willow_tree'],
+                        ['bicycle', 'bus', 'motorcycle', 'pickup_truck', 'train'],
+                        ['lawn_mower', 'rocket', 'streetcar', 'tank', 'tractor']]
+
+
+class CIFAR100CoarseData(pl.LightningDataModule):
+    # TODO: inherit from CIFAR100Data
+    def __init__(self, args):
+        super().__init__()
+        self.hparams = args
+        self.mean = (0.4914, 0.4822, 0.4465)
+        self.std = (0.2023, 0.1994, 0.2010)
+        ## if softmax targets are given, parse.
+        if args.get("custom_targets_train",False):
+            #self.set_targets_train = parse_softmax(args.softmax_targets_train)
+            ## training targets should be softmax! others should be binary.
+            self.set_targets_train = np.load(args.custom_targets_train)
+        else:
+            self.set_targets_train = None
+        if args.get("custom_targets_eval_ind",False):
+            self.set_targets_eval_ind = np.load(args.custom_targets_eval_ind)
+        else:
+            self.set_targets_eval_ind = None
+
+
+    def train_dataloader(self, shuffle=True, aug=True):
+        """added optional shuffle parameter for generating random labels.
+        added optional aug parameter to apply augmentation or not.
+
+        """
+        if aug is True:
+            transform = T.Compose(
+                [
+                    T.RandomCrop(32, padding=4),
+                    T.RandomHorizontalFlip(),
+                    T.ToTensor(),
+                    T.Normalize(self.mean, self.std),
+                ]
+            )
+        else:
+            transform = T.Compose(
+                [
+                    T.ToTensor(),
+                    T.Normalize(self.mean, self.std),
+                ]
+            )
+        dataset = CIFAR100Coarse(root=self.hparams.data_dir, train=True, transform=transform, download=True)
+        if self.set_targets_train is not None:
+            dataset.targets = self.set_targets_train
+            assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(
+                len(dataset.data), len(dataset.targets))
+            assert dataset.data.shape[1] >= np.max(
+                dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],
+                                                                                                np.max(dataset.targets))
+
+        dataloader = DataLoader(
+            dataset,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            shuffle=shuffle,
+            drop_last=False,
+            pin_memory=True,
+        )
+        return dataloader
+
+
+    def val_dataloader(self):
+        transform = T.Compose(
+            [
+                T.ToTensor(),
+                T.Normalize(self.mean, self.std),
+            ]
+        )
+        dataset = CIFAR100Coarse(root=self.hparams.data_dir, train=False, transform=transform, download=True)
+        if self.set_targets_eval_ind is not None:
+            dataset.targets = self.set_targets_eval_ind
+            assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(
+                len(dataset.data), len(dataset.targets))
+            assert dataset.data.shape[1] >= np.max(
+                dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],
+                                                                                                np.max(dataset.targets))
+        dataloader = DataLoader(
+            dataset,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            drop_last=False,
+            pin_memory=True,
+        )
+        return dataloader
+
+    def test_dataloader(self):
+        return self.val_dataloader()
