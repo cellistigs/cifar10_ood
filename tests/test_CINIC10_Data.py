@@ -25,10 +25,10 @@ class Test_CINIC10_Data():
             excfg = compose(config_name="run_default_cpu", overrides=["+softmax_targets={}".format(os.path.join(here,"test_mats","test_softmax_preds_less_classes.npy"))])
             classcfg = compose(config_name="run_default_cpu", overrides=["+softmax_targets={}".format(os.path.join(here,"test_mats","test_softmax_preds_less_examples.npy"))])
 
-        data = CINIC10_Data(cfg).test_dataloader().dataset
-        assert data.targets == self.testtargets
-        data = CINIC10_Data(overridecfg).test_dataloader().dataset
+        data = CINIC10_Data(softmaxcfg).test_dataloader().dataset
         assert data.targets != self.testtargets
+        with pytest.raises(AssertionError):
+            data = CINIC10_Data(classcfg).test_dataloader().dataset
         
 
 
