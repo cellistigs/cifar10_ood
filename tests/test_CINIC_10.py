@@ -32,6 +32,7 @@ class Test_CINIC10:
         cd = CINIC10(Path(downloads),"test",preload = True)
         assert cd.data.shape == (70000,32,32,3)
         assert len(cd.targets) == 70000 
+
     #def test_parity(self,tmpdir):
     #    downloads = tmpdir / "cinic-10"
     #    downloads.mkdir()
