@@ -641,7 +641,8 @@ class CIFAR100Data(pl.LightningDataModule):
                 T.Normalize(self.mean, self.std),
             ]
         )
-        dataset = CIFAR100(root=self.hparams.data_dir, train=False, transform=transform,download = True)
+        
+        dataset = CIFAR10(root=self.hparams.data_dir, train=False, transform=transform,download = True)
         if self.set_targets_eval_ind is not None:
             dataset.targets = self.set_targets_eval_ind 
             assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
