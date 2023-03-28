@@ -600,8 +600,19 @@ class CIFAR100Data(pl.LightningDataModule):
     def train_dataloader(self,shuffle = True,aug=True):
         """added optional shuffle parameter for generating random labels. 
         added optional aug parameter to apply augmentation or not. 
+        ## if softmax targets are given, parse.
+        if args.get("custom_targets_train",False):
+            #self.set_targets_train = parse_softmax(args.softmax_targets_train)
+            ## training targets should be softmax! others should be binary.
+            self.set_targets_train = np.load(args.custom_targets_train)
+        else:
+            self.set_targets_train = None
+        if args.get("custom_targets_eval_ind",False):
+            self.set_targets_eval_ind = np.load(args.custom_targets_eval_ind)
+        else:
+            self.set_targets_eval_ind = None
+        """    
 
-        """
         if aug is True:
             transform = T.Compose(
                 [
@@ -611,7 +622,7 @@ class CIFAR100Data(pl.LightningDataModule):
                     T.Normalize(self.mean, self.std),
                 ]
             )
-        else:    
+        else:
             transform = T.Compose(
                 [
                     T.ToTensor(),
@@ -620,10 +631,10 @@ class CIFAR100Data(pl.LightningDataModule):
             )
         dataset = CIFAR100(root=self.hparams.data_dir, train=True, transform=transform,download = True)
         if self.set_targets_train is not None:
-            dataset.targets = self.set_targets_train 
+            dataset.targets = self.set_targets_train
             assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
-            assert dataset.data.shape[1] >= np.max(dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],np.max(dataset.targets)) 
-            
+            assert dataset.data.shape[1] >= np.max(dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],np.max(dataset.targets))
+
         dataloader = DataLoader(
             dataset,
             batch_size=self.hparams.batch_size,
@@ -641,12 +652,6 @@ class CIFAR100Data(pl.LightningDataModule):
                 T.Normalize(self.mean, self.std),
             ]
         )
-        
-        dataset = CIFAR10(root=self.hparams.data_dir, train=False, transform=transform,download = True)
-        if self.set_targets_eval_ind is not None:
-            dataset.targets = self.set_targets_eval_ind 
-            assert len(dataset.data) == len(dataset.targets), "number of examples, {} does not match targets {}".format(len(dataset.data),len(dataset.targets))
-            assert dataset.data.shape[1] >= np.max(dataset.targets), "number of classes, {} does not match target index {}".format(dataset.data.shape[1],np.max(dataset.targets)) 
         dataloader = DataLoader(
             dataset,
             batch_size=self.hparams.batch_size,
