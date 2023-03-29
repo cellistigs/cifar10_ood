@@ -696,6 +696,7 @@ class CIFAR100Data(pl.LightningDataModule):
                 T.Normalize(self.mean, self.std),
             ]
         )
+        dataset = CIFAR100(root=self.hparams.data_dir, train=False, transform=transform,download = True)
         dataloader = DataLoader(
             dataset,
             batch_size=self.hparams.batch_size,
