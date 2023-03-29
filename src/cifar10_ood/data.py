@@ -501,7 +501,7 @@ class CIFAR10_BagData(CIFAR10Data):
 
     """
     def __init__(self, args):
-        super().__init__()
+        super().__init__(args)
 
     def train_dataloader(self,shuffle = True,aug=True,bag_seed = None):
         """bag.
