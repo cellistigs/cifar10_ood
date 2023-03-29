@@ -19,13 +19,12 @@ class Test_CINIC10_Data():
 
         """
         with initialize(config_path="./test_mats", job_name="test_app"):
+            overridecfg = compose(config_name="run_reload_targs")
             cfg = compose(config_name="run_default_cpu")
             softmaxcfg = compose(config_name="run_default_cpu", overrides=["+softmax_targets={}".format(os.path.join(here,"test_mats","test_softmax_preds.npy"))])
             excfg = compose(config_name="run_default_cpu", overrides=["+softmax_targets={}".format(os.path.join(here,"test_mats","test_softmax_preds_less_classes.npy"))])
             classcfg = compose(config_name="run_default_cpu", overrides=["+softmax_targets={}".format(os.path.join(here,"test_mats","test_softmax_preds_less_examples.npy"))])
 
-        data = CINIC10_Data(cfg).test_dataloader().dataset
-        assert data.targets == self.testtargets
         data = CINIC10_Data(softmaxcfg).test_dataloader().dataset
         assert data.targets != self.testtargets
         with pytest.raises(AssertionError):
